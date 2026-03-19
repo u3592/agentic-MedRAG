@@ -1,0 +1,16 @@
+*.env
+*.venv
+*.pyc
+*.dvd
+*.dvm
+*.doc
+*.tim
+*.tip
+*.tmd
+*.fdm
+*.fdt
+*.fdx
+*.nvd
+*.nvm
+*.si
+*.jsonl

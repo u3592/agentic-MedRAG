@@ -1,0 +1,10 @@
+huggingface_hub[hf_xet]
+langchain
+langchain-openai
+pyserini
+python-liquid
+sentence_transformers
+tqdm
+tiktoken
+transformers
+vllm

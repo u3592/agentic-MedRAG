@@ -1,0 +1,36 @@
+hf auth login
+
+conda activate venv
+
+model=qwen/Qwen3-0.6B
+model=qwen/Qwen3-4B
+model=google/gemma-3-4b-it
+
+scontrol show job $job
+scontrol show job $job | grep NodeList
+scontrol show job $job | grep JobState
+
+sbatch run.sh
+
+curl http://$NodeList:8000/v1/models
+
+curl -X POST "http://$NodeList:8000/v1/chat/completions" \
+	-H "Content-Type: application/json" \
+	--data '{
+		"model": $MODEL,
+		"messages": [
+			{
+				"role": "user",
+				"content": "Do you hear me?"
+			}
+		]
+	}'
+
+scancel $job
+
+sinfo -N -l --states=idle
+
+squeue -u $USER
+
+conda install -c conda-forge openjdk=21
+java --list-modules | grep vector
