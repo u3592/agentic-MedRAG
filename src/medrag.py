@@ -202,13 +202,16 @@ def create_digester_node(chain, retrieve_context):
         results = ""
         for q in state["queries"]:
             snippets, _ = retrieve_context(query=q.text, k=3)
-            result = chain.invoke({
-                "query": q.text,
-                "retrieved_documents": snippets,
-                "format_instructions": digester_parser.get_format_instructions(),
-            })
-            results += "Results for {:s}:\n".format(q.text)
-            results += "\n".join([finding.text for finding in result.findings]) + "\n"
+            try:
+                result = chain.invoke({
+                    "query": q.text,
+                    "retrieved_documents": snippets,
+                    "format_instructions": digester_parser.get_format_instructions(),
+                })
+                results += "Results for {:s}:\n".format(q.text)
+                results += "\n".join([finding.text for finding in result.findings]) + "\n"
+            except:
+                results = None
         return {
             **state,
             "literature": [results],
@@ -250,17 +253,21 @@ def create_examiner_node(chain, helper_chain, retrieve_context):
                         "format_instructions": factchecker_parser.get_format_instructions(),
                     })
                     state["knowledge_cache"] += [helper_result.json()]
-                result = chain.invoke({
-                    "hypothesis": hypothesis.json(),
-                    "question": question,
-                    "options": options,
-                    "context": context,
-                    "knowledge_cache": state["knowledge_cache"],
-                    "literature": literature,
-                    "format_instructions": examiner_parser.get_format_instructions(),
-                })
-                state["comments"][i] = result.comment
-                state["require_fixing"] = result.require_fixing
+                try:
+                    result = chain.invoke({
+                        "hypothesis": hypothesis.json(),
+                        "question": question,
+                        "options": options,
+                        "context": context,
+                        "knowledge_cache": state["knowledge_cache"],
+                        "literature": literature,
+                        "format_instructions": examiner_parser.get_format_instructions(),
+                    })
+                    state["comments"][i] = result.comment
+                    state["require_fixing"] = result.require_fixing
+                except:
+                    state["comments"][i+1] = "Error occured."
+                    state["retries"] += 99
             context.append(hypothesis.conclusion)
             if state["require_fixing"]:
                 break
@@ -273,7 +280,7 @@ def create_fixer_node(chain):
         step = state["step"]
         state["retries"] += 1
         if state["retries"] > state["max_retries"]:
-            state["comments"][step] = "Max retries reached. "
+            state["comments"][step+1] = "Max retries reached. "
         hypotheses = [hypothesis.json() for hypothesis in state["hypotheses"][:step]]
         try:
             result = chain.invoke({
@@ -285,10 +292,10 @@ def create_fixer_node(chain):
                 "literature": state["literature"],
                 "format_instructions": fixer_parser.get_format_instructions(),
             })
+            state["hypotheses"] = state["hypotheses"][:step] + result.hypotheses
         except Exception as e:
-            state["comments"][step] = f"Error: {e}"
+            state["comments"][step+1] = f"Error: {e}"
             state["retries"] += 99
-        state["hypotheses"] = state["hypotheses"][:step] + result.hypotheses
         return state
     return node
 
