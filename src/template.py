@@ -95,7 +95,7 @@ digester_system = '''
 System role: Literature digester.
 
 Task:
-Summarize relevant findings from the retrieved documents.
+Summarize findings from the retrieved documents.
 IF no findings is available, return an empty list.
 
 Output:
@@ -105,14 +105,15 @@ A list of findings. Each finding consists of:
 - Justification: Brief explanation.
 
 Rules:
+- Do NOT assume the answer.
 - Do NOT attempt to answer the problem.
 - Do NOT fabricate findings.
 - Finding(s) MUST be derived strictly from the retrieved document(s); do NOT infer, speculate, or generalize beyond what is EXPLICITLY stated.
 - Extract findings separately for each retrieved document; do NOT combine information from multiple documents into a single finding.
-- The Text field must be a concise paraphrase, NOT a verbatim copy; use short, clear phrases that capture the essence of the finding
+- The Text field MUST be a concise paraphrase, NOT a verbatim copy; use short, clear phrases that capture the essence of the finding
 
 ###Example
-Problem: Does Drug F improve Recovery Time after Surgery?
+Query: Drug F improve Recovery Time after Surgery
 ###Retrieved Documents:
 Document [0] (Title: Randomized Controlled Trial of Drug F in Post-Surgical Recovery) ...(omitted)
 Document [1] (Title: Observational Study of Drug F in Outpatient Clinics) ...(omitted)
@@ -130,11 +131,9 @@ Document [2] (Title: Drug F safety profile) ...(omitted)
          "justification": "Finds no significant difference in recovery time among patients in outpatient settings."}}]}}
 '''
 digester_user = '''
-Here is the problem: {question}
+Query: {query}
 
-Here are the options (ONLY for reference): {options}
-
-Here are the retrieved document(s):
+Retrieved document(s):
 {retrieved_documents}
 
 Return ONLY a valid JSON object.
@@ -243,10 +242,10 @@ Rule:
 - Mark verified = true ONLY IF none of the documents contradict the statement AND any document EXPLICITLY supports the statement.
 '''
 factchecker_user = '''
-Here is the statement:
+Statement:
 {statement}
 
-Here are the retrieved documents:
+Retrieved document(s):
 {retrieved_documents}
 
 Return ONLY a valid JSON object.
@@ -269,41 +268,42 @@ A hypothesis is a structured reasoning unit consisting of:
 - Conclusion: A proposition that logically follows from the premises.
 
 Output:
-- Comment: A concise rationale. Explain how the hypothesis is true or false, focusing on contextual accuracy and logical consistency.
-- Require Fixing: Mark as True if the reasoning is faulty and require fixing.
+- Comment: A HINT that nudges toward the correct reasoning.
+- Require Fixing: Mark as True if the reasoning is faulty and requires fixing.
 
 Rules:
 - Do NOT assume the hypothesis is true.
-- Hypothesis must be relevant to the problem and options.
+- Do NOT assume the answer.
 - Irrelevant or tangential reasoning is NOT permitted.
-- Medical terms MUST be used consistently.
 - Each premise must be derived from one of the following sources:
    - Stem
    - Question
    - Options
-   - Prior conclusion
+   - Knowledge Cache
    - Literature
+   - Prior conclusion
    - Medical knowledge
 - All premises MUST be contextually appropriate.
-- Medical knowledge MUST be applied ONLY at the correct anatomical/pathological level.
 - The conclusion MUST logically follow from the premises.
+- IF the premises are valid AND the conclusion logically follow from the premises, THEN the conclusion MUST be true.
 - Medical terms MUST be used consistently.
+- Medical knowledge MUST be applied ONLY at the correct anatomical/pathological level.
 
 Example 1:
 ###Problem
-Patient presents sign F, G and symptom H. Examination shows finding I. Which of the following is the most appropriate diagnosis?
+Patient presents signs F, G and symptom H. Examination shows finding I. Which of the following is the most appropriate diagnosis?
 ###Options
-{{"A":"Disease K subtype L", "B":"Disease K subtype M"}}
+{{"A":"Disease K Subtype L", "B":"Disease K Subtype M"}}
 ###Prior Conclusions
 ["Patient has condition J.", ]
 ###Hypothesis
 {{"premises": [{{"text": "Patient has condition J.", "source": "prior conclusion"}}, {{"text": "Condition J is commonly caused by disease K.", "source": "medical knowledge"}}], "conclusion": "Patient may have disease K."}},
 ###Result
-{{"comment": "Premises are evidence-based. Conclusion logically follows from the premises.", "require_fixing": false, "force_stop": false}}
+{{"comment": "", "require_fixing": false}}
 
 Example 2:
 ###Problem
-Patient presents sign F, G and symptom H. Examination shows finding I. Which of the following is the most appropriate diagnosis?
+Patient presents signs F, G and symptom H. Examination shows finding I. Which of the following is the most appropriate diagnosis?
 ###Options
 {{"A":"Disease K subtype L", "B":"Disease K subtype M"}}
 ###Prior Conclusions
@@ -311,11 +311,11 @@ Patient presents sign F, G and symptom H. Examination shows finding I. Which of 
 ###Hypothesis
 {{"premises": [{{"text": "Patient has condition J.", "source": "prior conclusion"}}, {{"text": "Condition J is commonly caused by disease K.", "source": "medical knowledge"}}], "conclusion": "Patient may have disease K."}},
 ###Result
-{{"comment": "Hypothesis relies on 'Patient has condition J,' but this premise is unsupported by prior conclusions. Logical chain is incomplete.", "require_fixing": true, "force_stop": false}}
+{{"comment": "Do not fabricate evidence. Premise 'Patient has condition J' is unsupported by prior conclusions. ", "require_fixing": true}}
 
 Example 3:
 ###Problem
-Patient presents sign F, G and symptom H. Examination shows finding I. Which of the following is the most appropriate diagnosis?
+Patient presents signs F, G and symptom H. Examination shows finding I. Which of the following is the most appropriate diagnosis?
 ###Options
 {{"A":"Disease K subtype L", "B":"Disease K subtype M"}}
 ###Prior Conclusions
@@ -323,7 +323,7 @@ Patient presents sign F, G and symptom H. Examination shows finding I. Which of 
 ###Hypothesis
 {{"premises": [{{"text": "Patient may have disease K.", "source": "prior conclusion"}}, {{"text": "Disease K is characterized by finding I", "source": "medical knowledge"}}], "conclusion": "Patient have disease K."}},
 ###Result
-{{"comment": "Premises suggest possibility of disease K, but the conclusion asserts certainty. Conclusion do not logically follow from the premises.", "require_fixing": true, "force_stop": false}}
+{{"comment": "Do not escalate modal certainty. Prior conclusion only suggest possibility of disease K.", "require_fixing": true}}
 
 #Example 4
 ###Problem
@@ -335,10 +335,10 @@ Drug F is commonly used to alleviate Symptom K. The expected beneficial effect o
 ###Hypothesis
 {{"premises": [{{"text": "Mechanism G is a mechanism of Drug E's ototoxicity.", "source": "prior conclusion"}}, {{"text": "Option A states Mechanism G", "source": "optiosn"}}], "conclusion": "Option A is correct."}},
 ###Result
-{{"comment": "Premises are accurate, but misaligned with the problem. The hypothesis addresses ototoxicity, while the problem asks about beneficial effect.", "require_fixing": true, "force_stop": false}}
+{{"comment": "Do refer back to the problem. The hypothesis addresses ototoxicity, while the problem asks about beneficial effect.", "require_fixing": true}}
 '''
 examiner_user = '''
-The hypothesis to examine:
+Hypothesis to examine:
 {hypothesis}
 
 Problem:
@@ -368,7 +368,7 @@ fixer_system = '''
 System role: Medical expert.
 
 Task:
-Build a reasoning bridge that links the problem to the answer.
+Continue the reasoning bridge that links the problem to the answer.
 
 Output:
 A list of hypotheses. Each hypothesis is a structured reasoning unit consisting of:
@@ -412,20 +412,25 @@ Rules:
 - If any premise is false or contextually misapplied, the conclusion must be rejected.
 
 Example:
+###Hypothesis
+[  {{
+   "premises": [{{"text": "Patient presents signs F, G and symptoms H.", "source": "stem"}}, {{"text": "Signs F, G are strongly associated with condition J", "source": "medical knowledge"}}],
+   "conclusion": "Patient has condition J."}},
+   {{
+   "premises": [{{"text": "Patient has condition J.", "source": "prior conclusion"}}, {{"text": "Condition J is commonly caused by disease K.", "source": "medical knowledge"}}],
+   "conclusion": "Patient may have disease K."}},]
+###Annotation
+"check the knowledge cache for updated knowledge."
 ###Problem
 Patient presents signs F, G and symptom H. Examination shows finding I. Which of the following is the most appropriate diagnosis?
 ###Options
 {{"A": "Disease K subtype L.", "B":"Disease K subtype M.", "C":"Disease N subtype O.", "D": "Disease N subtype P."}}
+###Knowledge Cache
+[{{"text": "Disease K is characterized by finding I", "verified": true, "rationale":""}}]
 ###Result
 {{"hypotheses": [
     {{
-      "premises": [{{"text": "Patient presents signs F, G and symptoms H.", "source": "stem"}}, {{"text": "Signs F, G are strongly associated with condition J", "source": "medical knowledge"}}],
-      "conclusion": "Patient has condition J."}},
-    {{
-      "premises": [{{"text": "Patient has condition J.", "source": "prior conclusion"}}, {{"text": "Condition J is commonly caused by disease K.", "source": "medical knowledge"}}],
-      "conclusion": "Patient may have disease K."}},
-    {{
-      "premises": [{{"text": "Patient may have disease K.", "source": "prior conclusion"}}, {{"text":"Examination shows finding I.", "source":"stem"}}, {{"text":"Disease K is characterized by finding I", "source":"medical knowledge"}}],
+      "premises": [{{"text": "Patient may have disease K.", "source": "prior conclusion"}}, {{"text":"Examination shows finding I.", "source":"stem"}}, {{"text":"Disease K is characterized by finding I", "source":"knowledge cache"}}],
       "conclusion": "Patient has disease K."}},
     {{
       "premises": [{{"text": "Patient has disease K.", "source": "prior conclusion"}}, {{"text": "Disease K has subtype L and subtype M.", "source": "options"}}, {{"text": "Symptom H is strongly associated with subtype M.", "source": "medical knowledge"}}],
@@ -435,7 +440,7 @@ Patient presents signs F, G and symptom H. Examination shows finding I. Which of
       "conclusion": "Option B is correct."}}]}}
 '''
 fixer_user = '''
-Hypotheses to fix:
+Hypotheses:
 {hypotheses}
 
 Annotation:
@@ -446,9 +451,6 @@ Problem:
 
 Options:
 {options}
-
-Prior Conclusions:
-{context}
 
 Knowledge Cache:
 {knowledge_cache}
@@ -477,7 +479,7 @@ Rules:
 - The result is for research purposes, please give a definite answer.
 '''
 evaluator_user ='''
-Here is the problem:
+Problem:
 {question}
 
 Reasoning Steps:

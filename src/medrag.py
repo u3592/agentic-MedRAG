@@ -43,7 +43,7 @@ class DigesterOutput(BaseModel):
 
 class Premise(BaseModel):
     text: str = Field(..., description="Format: [Subject] + [Predicate] + [Object] + [Adjuncts]")
-    source: Literal["stem", "question", "options", "prior conclusion", "literature", "medical knowledge", "knowledge cache"]
+    source: Literal["stem", "question", "options", "literature", "knowledge cache", "prior conclusion", "medical knowledge"]
 
 class Hypothesis(BaseModel):
     premises: List[Premise] = Field(default_factory=list,)
@@ -79,8 +79,9 @@ class GraphState(TypedDict):
     knowledge_cache: List[Any]
     comments: List[Any]
     require_fixing: bool
-    retries: int
     max_retries: int
+    retries: int
+    step: int
 
 general_prompt = ChatPromptTemplate.from_messages([
     ("system", general_system),
@@ -188,23 +189,21 @@ def create_planner_node(chain):
             **state,
             "queries": result.queries,
             "require_fixing": False,
-            "max_retries": 3,
+            "step": 0,
+            "comments": [None]*12,
+            "knowledge_cache": [],
             "retries": 0,
-            "comments": [],
-            "knowledge_cache": []
+            "max_retries": 0
         }
     return node
 
 def create_digester_node(chain, retrieve_context):
     def node(state: GraphState) -> GraphState:
         results = ""
-        question = state["question"]
-        options = state["options"]
         for q in state["queries"]:
             snippets, _ = retrieve_context(query=q.text, k=3)
             result = chain.invoke({
-                "question": question,
-                "options": options,
+                "query": q.text,
                 "retrieved_documents": snippets,
                 "format_instructions": digester_parser.get_format_instructions(),
             })
@@ -227,54 +226,69 @@ def create_compiler_node(chain):
         return {
             **state,
             "hypotheses": result.hypotheses,
+            "max_retries": len(result.hypotheses)
         }
     return node
 
 def create_examiner_node(chain, helper_chain, retrieve_context):
     def node(state: GraphState) -> GraphState:
-        if state["retries"] > state["max_retries"]:
-            return state
+        if state["retries"] >= state["max_retries"]: return state
         hypotheses = state["hypotheses"]
         question = state["question"]
         options = state["options"]
         literature = state["literature"]
         context = []
         for i, hypothesis in enumerate(hypotheses):
-            premises = [premise for premise in hypothesis.premises if premise.source == "medical knowledge"]
-            for premise in premises:
-                snippets, _ = retrieve_context(query=premise.text, k=3)
-                helper_result = helper_chain.invoke({
-                    "statement": premise.text,
-                    "retrieved_documents": snippets,
-                    "format_instructions": factchecker_parser.get_format_instructions(),
+            if state["step"] <= i:
+                state["step"] = i
+                premises = [premise for premise in hypothesis.premises if premise.source == "medical knowledge"]
+                for premise in premises:
+                    snippets, _ = retrieve_context(query=premise.text, k=3)
+                    helper_result = helper_chain.invoke({
+                        "statement": premise.text,
+                        "retrieved_documents": snippets,
+                        "format_instructions": factchecker_parser.get_format_instructions(),
+                    })
+                    state["knowledge_cache"] += [helper_result.json()]
+                result = chain.invoke({
+                    "hypothesis": hypothesis.json(),
+                    "question": question,
+                    "options": options,
+                    "context": context,
+                    "knowledge_cache": state["knowledge_cache"],
+                    "literature": literature,
+                    "format_instructions": examiner_parser.get_format_instructions(),
                 })
-                state["knowledge_cache"] += [helper_result.json()]
-            result = chain.invoke({
-                "hypothesis": hypothesis.json(),
-                "question": question,
-                "options": options,
-                "context": context,
-                "knowledge_cache": state["knowledge_cache"],
-                "literature": literature,
-                "format_instructions": examiner_parser.get_format_instructions(),
-            })
+                state["comments"][i] = result.comment
+                state["require_fixing"] = result.require_fixing
             context.append(hypothesis.conclusion)
-            state["comments"] += ["R{:d}H{:d}: ".format(state["retries"], i)+result.comment]
-            state["require_fixing"] &= result.require_fixing
+            if state["require_fixing"]:
+                break
         return state
     return node
 
 def create_fixer_node(chain):
     def node(state: GraphState) -> GraphState:
+        state["require_fixing"] = False
+        step = state["step"]
         state["retries"] += 1
-        result = chain.invoke({
-            "question": state["question"],
-            "options": state["options"],
-            "knowledge_cache": state["knowledge_cache"],
-            "literature": state["literature"],
-            "format_instructions": fixer_parser.get_format_instructions(),
-        })
-        state["hypotheses"] = result.hypotheses
+        if state["retries"] > state["max_retries"]:
+            state["comments"][step] = "Max retries reached. "
+        hypotheses = [hypothesis.json() for hypothesis in state["hypotheses"][:step]]
+        try:
+            result = chain.invoke({
+                "hypotheses": hypotheses,
+                "question": state["question"],
+                "options": state["options"],
+                "comment": state["comments"][-1],
+                "knowledge_cache": state["knowledge_cache"],
+                "literature": state["literature"],
+                "format_instructions": fixer_parser.get_format_instructions(),
+            })
+        except Exception as e:
+            state["comments"][step] = f"Error: {e}"
+            state["retries"] += 99
+        state["hypotheses"] = state["hypotheses"][:step] + result.hypotheses
         return state
     return node
 
@@ -284,7 +298,7 @@ def create_evaluator_node(chain):
         hypotheses = state["hypotheses"]
         comments = state["comments"]
         content = "".join([
-            "[{:d}] Hypothesis: {:s}, Annotation: {:s}\n".format(i, hypothesis.json(), comment) for i, (hypothesis, comment) in enumerate(zip(hypotheses, comments))
+            "[{:d}] {:s}, Annotation: {:s}\n".format(i, hypothesis.json(), comment) for i, (hypothesis, comment) in enumerate(zip(hypotheses, comments))
         ])
         result = chain.invoke({
             "question": state["question"],
@@ -314,7 +328,7 @@ class AgenticMedRAG:
             model = self.llm_name,
             base_url = "http://localhost:8000/v1",
             max_retries=1,
-            max_tokens = 16384,
+            max_tokens = 8192,
             api_key = "EMPTY",
             seed = 42, 
             top_p = 1,

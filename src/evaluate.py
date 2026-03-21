@@ -49,8 +49,8 @@ if __name__ == "__main__":
             options = qdata["options"]
             true_answer = qdata["answer"]
             
-            error_type = None
-            error_traceback = None
+            error_type = ""
+            error_traceback = ""
             result = {"answer_choice": None, "justification": None}
             
             # result, callback = medrag.answer(question=question, options=options)
@@ -76,11 +76,11 @@ if __name__ == "__main__":
                 "knowledge_cache": result.get("knowledge_cache", []),
                 "comments": result.get("comments", None),
                 "is_correct": (result.get("answer_choice", None) == true_answer),
-                "error_type": error_type,
-                "error_traceback": error_traceback,
+                "error_type": error_type[:100]+error_type[-200:],
+                "error_traceback": error_traceback[:100]+error_traceback[-200:],
             }
 
-            f.write(json.dumps(result_log, indent=4) + "\n")
+            f.write(json.dumps(result_log,) + "\n")
                         
             f.flush()
             os.fsync(f.fileno())
