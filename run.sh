@@ -17,4 +17,4 @@ until curl -s http://localhost:8000/v1/models > /dev/null; do
     echo "Waiting for vLLM server..."
     sleep 5
 done
-srun python src/evaluate.py --llm_name "$MODEL_NAME" --dataset_name "$DATASET_NAME" --n 20 --agents
+srun python src/evaluate.py --llm_name "$MODEL_NAME" --dataset_name "$DATASET_NAME" --m 196 --agents

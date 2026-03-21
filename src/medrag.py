@@ -180,17 +180,21 @@ def create_general_node(chain, retrieve_context):
 
 def create_planner_node(chain):
     def node(state: GraphState) -> GraphState:
-        result = chain.invoke({
-            "question": state["question"],
-            "options": state["options"],
-            "format_instructions": planner_parser.get_format_instructions(),
-        })
+        try:
+            result = chain.invoke({
+                "question": state["question"],
+                "options": state["options"],
+                "format_instructions": planner_parser.get_format_instructions(),
+            })
+            queries = result.queries
+        except:
+            queries = []
         return {
             **state,
-            "queries": result.queries,
+            "queries": queries,
             "require_fixing": False,
             "step": 0,
-            "comments": [None]*12,
+            "comments": [""]*12,
             "knowledge_cache": [],
             "retries": 0,
             "max_retries": 0
@@ -229,7 +233,7 @@ def create_compiler_node(chain):
         return {
             **state,
             "hypotheses": result.hypotheses,
-            "max_retries": len(result.hypotheses)
+            "max_retries": 1 + len(result.hypotheses)//2
         }
     return node
 
@@ -266,7 +270,7 @@ def create_examiner_node(chain, helper_chain, retrieve_context):
                     state["comments"][i] = result.comment
                     state["require_fixing"] = result.require_fixing
                 except:
-                    state["comments"][i+1] = "Error occured."
+                    state["comments"][-1] = "Error occured at Examiner."
                     state["retries"] += 99
             context.append(hypothesis.conclusion)
             if state["require_fixing"]:
@@ -293,8 +297,8 @@ def create_fixer_node(chain):
                 "format_instructions": fixer_parser.get_format_instructions(),
             })
             state["hypotheses"] = state["hypotheses"][:step] + result.hypotheses
-        except Exception as e:
-            state["comments"][step+1] = f"Error: {e}"
+        except:
+            state["comments"][-1] = f"Error occured at Fixer."
             state["retries"] += 99
         return state
     return node

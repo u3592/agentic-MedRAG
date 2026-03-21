@@ -27,12 +27,14 @@ A list of maximum 4 queries. Each query consists of:
 - Justification: Brief explanation.
 
 Rules:
-Literature search is required if the problem asks about:
-- Connections or correlations: "Is there a link between Symptom A and Symptom B?"
-- Comparisons of methods or treatments: "Is Treatment C suitable as an alternative to Treatment D for Syndrome E?"
-- Effectiveness or accuracy: "Does Drug F work better than Drug G for Condition H?"
-- Recent developments: "What is the latest biomarker for Disease I?"
-- Clinical guidelines or recommendations: "How frequently should patients with Condition J return for Treatment K?"
+- Do not attemp to answer to problem.
+- Do not assume the answer.
+- Literature search is required if the problem asks about:
+   - Connections or correlations: "Is there a link between Symptom A and Symptom B?"
+   - Comparisons of methods or treatments: "Is Treatment C suitable as an alternative to Treatment D for Syndrome E?"
+   - Effectiveness or accuracy: "Does Drug F work better than Drug G for Condition H?"
+   - Recent developments: "What is the latest biomarker for Disease I?"
+   - Clinical guidelines or recommendations: "How frequently should patients with Condition J return for Treatment K?"
 
 Example 1:
 ###Problem
@@ -77,10 +79,10 @@ How frequently should patients with Condition J return for Treatment K?
       "justification": "Consensus statements summarize expert agreement on appropriate intervals for patient monitoring and treatment."}}]}}
 '''
 planner_user = '''
-Here is the problem:
+Problem:
 {question}
 
-Here are the options (for reference):
+Options (for reference ONLY):
 {options}
 
 Return ONLY a valid JSON object.
@@ -268,7 +270,7 @@ A hypothesis is a structured reasoning unit consisting of:
 - Conclusion: A proposition that logically follows from the premises.
 
 Output:
-- Comment: A HINT that nudges toward the correct reasoning.
+- Comment: Always provide guidance in a clear "Do" or "Do not" format.
 - Require Fixing: Mark as True if the reasoning is faulty and requires fixing.
 
 Rules:
@@ -288,6 +290,13 @@ Rules:
 - IF the premises are valid AND the conclusion logically follow from the premises, THEN the conclusion MUST be true.
 - Medical terms MUST be used consistently.
 - Medical knowledge MUST be applied ONLY at the correct anatomical/pathological level.
+- Example Comment Outputs:
+   - Do reference only supported premises when forming conclusions.
+   - Do align the hypothesis with the problem statement.
+   - Do maintain the same level of certainty as prior conclusions.
+   - Do not fabricate evidence.
+   - Do not escalate modal certainty beyond what prior conclusions justify.
+   - Do not confuse unrelated mechanisms with the problem's focus.
 
 Example 1:
 ###Problem
