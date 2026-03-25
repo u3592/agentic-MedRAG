@@ -15,56 +15,57 @@ Here are the potential choices:
 {format_instructions}
 '''
 
-planner_system = '''
+translator_system = '''
 System role: Medical expert.
-Task: Determine whether literature search is required to evaluate the problem.
-If so, generate a list of queries that could be searched in the literature.
-Else return an empty list.
+Task: Translate the problem into claims.
 
 Output:
-A list of maximum 4 queries. Each query consists of:
-- Text: [Subject] + [Predicate] + [Object] + [Evidence source or study design]
-- Justification: Brief explanation.
+A list of claims. Each query consists of:
+- subject
+- predicate
+- object
+- adjuncts
 
-Rules:
+Field Rules:
+- `subject` and `object` MUST each represent EXACTLY ONE entity or event, with ANY directly attached modifiers preserved.
+- `subject` and `object` MUST NOT contain conjunctions ("and", "or"); split compound outcomes into separate claims.
+- `predicate` links the subject to the object.
+- `adjuncts` are modifiers (adverbs, phrases, clauses) that give auxiliary context; do NOT duplicate modifiers already embedded in the subject or object.
+
+Feneration Rules:
 - Do not attemp to answer to problem.
 - Do not assume the answer.
-- Literature search is required if the problem asks about:
-   - Connections or correlations: "Is there a link between Symptom A and Symptom B?"
-   - Comparisons of methods or treatments: "Is Treatment C suitable as an alternative to Treatment D for Syndrome E?"
-   - Effectiveness or accuracy: "Does Drug F work better than Drug G for Condition H?"
-   - Recent developments: "What is the latest biomarker for Disease I?"
-   - Clinical guidelines or recommendations: "How frequently should patients with Condition J return for Treatment K?"
 
 Example 1:
 ###Problem
 Is there a link between Symptom A and Symptom B?
+###Options
+{{"A":"yes", "B":"no", "C":"", "D":""}}
 ###Result
-{{"queries": [
+{{"claims": [
    {{
-      "text": "Symptom A association Symptom B epidemiological studies", 
-      "justification": "Epidemiological research can reveal whether populations show a statistical correlation between the two symptoms."}},
-   {{
-      "text": "Symptom A pathophysiological mechanism Symptom B biological plausibility",
-      "justification": "Mechanistic studies help explain why the symptoms might be linked, strengthening the evidence beyond correlation."}},
-   {{
-      "text": "Symptom A temporal relationship Symptom B longitudinal cohort studies",
-      "justification": "Longitudinal data can reveal whether one symptom tends to precede or follow the other, suggesting causality or progression."}}]}}
+      "subject": "Symptom A",
+      "predicate":"is associated with",
+      "object":"Symptom B",
+      "adjuncts":[]}}]}}
 
 Example 2:
 ###Problem
 Does Drug F work better than Drug G for Condition H?
 ###Result
-{{"queries": [
+###Problem
+Is there a link between Symptom A and Symptom B?
+###Options
+{{"A":"yes", "B":"no", "C":"", "D":""}}
+###Result
+{{"claims": [
    {{
-      "text": "Drug F comparative effectiveness Drug G randomized controlled trials",
-      "justification": "RCTs provide the strongest evidence for comparing the effectiveness of two drugs."}},
-   {{
-      "text": "Drug F treatment outcomes Drug G meta-analysis systematic reviews",
-      "justification": "Meta-analyses synthesize multiple studies to give a more reliable estimate of comparative effectiveness."}},
-   {{
-      "text": "Drug F safety profile Drug G adverse events pharmacovigilance data",
-      "justification": "Safety outcomes are essential to determine whether one drug is preferable over another."}}]}}
+      "subject": "Symptom A",
+      "predicate":"is associated with",
+      "object":"Symptom B",
+      "adjuncts":[]}},
+      
+      ]}}
 
 Example 3:
 ###Problem
@@ -78,7 +79,7 @@ How frequently should patients with Condition J return for Treatment K?
       "text": "Condition J monitoring schedule Treatment K consensus statements", 
       "justification": "Consensus statements summarize expert agreement on appropriate intervals for patient monitoring and treatment."}}]}}
 '''
-planner_user = '''
+translator_user = '''
 Problem:
 {question}
 

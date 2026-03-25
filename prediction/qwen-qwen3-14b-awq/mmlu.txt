@@ -1,6 +1,3 @@
-anatomy-000	A lesion causing compression of the facial nerve at the stylomastoid foramen will cause ipsilateral	{'A': 'paralysis of the facial muscles.', 'B': 'paralysis of the facial muscles and loss of taste.', 'C': 'paralysis of the facial muscles, loss of taste and lacrimation.', 'D': 'paralysis of the facial muscles, loss of taste, lacrimation and decreased salivation.'}	A
-answer_choice='D' justification='A lesion at the stylomastoid foramen compresses the facial nerve, which controls motor function of the facial muscles, taste from the anterior two-thirds of the tongue (via the chorda tympani), and parasympathetic innervation to the lacrimal gland (zygomatic branch) and submandibular/sublingual glands (chorda tympani). This results in ipsilateral facial paralysis, loss of taste, decreased lacrimation, and reduced salivation. All these functions are mediated by the facial nerve distal to the stylomastoid foramen, which is disrupted by the lesion.'
-
 {
     "qid": "mmlu/anatomy-000",
     "question": "A lesion causing compression of the facial nerve at the stylomastoid foramen will cause ipsilateral",

@@ -3,10 +3,10 @@
 #SBATCH --gres=gpu:1
 #SBATCH -t 12:00:00
 
-# export MODEL_NAME="Qwen/Qwen3-14B-AWQ"
-export MODEL_NAME="qwen/Qwen3-4B"
+export MODEL_NAME="Qwen/Qwen3-14B-AWQ"
+# export MODEL_NAME="qwen/Qwen3-4B"
 export BASE_URL="http://localhost:8000/v1"
-export DATASET_NAME="medqa"
+export DATASET_NAME="mmlu"
 
 vllm serve "$MODEL_NAME" --port 8000 &
 VLLM_PID=$!
@@ -17,4 +17,4 @@ until curl -s http://localhost:8000/v1/models > /dev/null; do
     echo "Waiting for vLLM server..."
     sleep 5
 done
-srun python src/evaluate.py --llm_name "$MODEL_NAME" --dataset_name "$DATASET_NAME" --m 196 --agents
+srun python src/evaluate.py --llm_name "$MODEL_NAME" --dataset_name "$DATASET_NAME" --n 100 --agents

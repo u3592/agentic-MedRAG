@@ -1,6 +1,6 @@
 import argparse
 import json
-from medrag import AgenticMedRAG
+from medrag_dfa import AgenticMedRAG
 import os
 import re
 import traceback
