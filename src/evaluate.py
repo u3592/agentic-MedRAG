@@ -1,6 +1,6 @@
 import argparse
 import json
-from medrag_dfa import AgenticMedRAG
+from medrag import AgenticMedRAG
 import os
 import re
 import traceback
@@ -45,7 +45,11 @@ if __name__ == "__main__":
     with open(os.path.join(dir, f"{dataset_name}.txt"), 'a') as f:
 
         for qid, qdata in subset[dataset_name].items():
-            question = qdata["question"]
+            stem = qdata.get("contexts", "")
+            if stem:
+                question = stem+" "+qdata["question"]
+            else:
+                question = qdata["question"]
             options = qdata["options"]
             true_answer = qdata["answer"]
             
@@ -63,24 +67,15 @@ if __name__ == "__main__":
                 error_type = f"Exception: {repr(e)}"
                 error_traceback = traceback.format_exc()
             
-            result_log = {
-                "qid": f"{dataset_name}/{qid}",
-                "question": question,
-                "options": options,
-                "true_answer": true_answer,
-                "answer_choice": result.get("answer_choice", None),
-                "justification": result.get("justification", None),
-                "queries": str(result.get("queries", [])),
-                "literature": result.get("literature", []),
-                "hypotheses": str(result.get("hypotheses", None)),
-                "knowledge_cache": result.get("knowledge_cache", []),
-                "comments": result.get("comments", None),
-                "is_correct": (result.get("answer_choice", None) == true_answer),
-                "error_type": error_type[:100]+error_type[-200:],
-                "error_traceback": error_traceback[:100]+error_traceback[-200:],
-            }
+            result["qid"] = f"{dataset_name}/{qid}",
+            result["is_correct"] = result.get("answer_choice", None) == true_answer
+            result["true_answer"] = true_answer
+            result["error_type"] =  error_type[:200]+error_type[-200:]
+            result["error_traceback"] = error_traceback[:200]+error_traceback[-200:]
+            result["queries"] = [it.model_dump() for it in result["queries"]]
+            result["hypotheses"] = [it.model_dump() for it in result["hypotheses"]]
 
-            f.write(json.dumps(result_log,) + "\n")
+            f.write(json.dumps(result) + "\n")
                         
             f.flush()
             os.fsync(f.fileno())
